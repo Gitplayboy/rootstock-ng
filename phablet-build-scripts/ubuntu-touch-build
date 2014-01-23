@@ -1,0 +1,214 @@
+#!/bin/bash
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the the GNU General Public License version 3, as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranties of
+# MERCHANTABILITY, SATISFACTORY QUALITY or FITNESS FOR A PARTICULAR
+# PURPOSE.  See the applicable version of the GNU Lesser General Public
+# License for more details.
+#.
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright (C) 2013 Canonical, Ltd.
+
+# The android build gets confused with this set
+
+set -e
+
+export series=saucy
+export ubuntu_base=$series-preinstalled-phablet-armhf
+export ubuntu_img=$ubuntu_base.zip
+export ubuntu_img_manifest=$ubuntu_base.manifest
+export changelog=$WORKSPACE/archive/$series-preinstalled.changelog
+export tar_dir=$WORKSPACE/archive/livebuild
+export product=ubuntu-touch-$series-armhf
+export changelog_dir=$WORKSPACE/changelogs
+export stamp=$(pwd)/ubuntu/assets/ubuntu_stamp
+export JENKINS_BUILD_NUMBER=$series-$BUILD_NUMBER
+unset BUILD_NUMBER
+export http_proxy=http://10.128.92.2:3128
+export https_proxy=http://10.128.92.2:3128
+export
+
+pretty_print_branch() {
+    bzr info|sed -n -e 's/.*parent branch: .*\(~.*\)\/$/lp:\1/p'
+}
+
+sum_append() {
+    cd archive
+    md5sum $1 > $1.md5sum
+    cd -
+}
+
+create_build_stamp() {
+    echo Creating build stamp
+    if [ -f $stamp ]
+    then
+        rm $stamp
+        if [ -n "$1" ]
+        then
+            echo HARDWARE=$1 >> $stamp
+        fi
+        echo JENKINS_BUILD=$JENKINS_BUILD_NUMBER >> $stamp
+        echo UBUNTU=$product >> $stamp
+        for dir in ubuntu/platform-api
+        do
+            cd $dir
+            echo $dir=$(pretty_print_branch):$(bzr revno) >> $stamp
+            cd -
+        done
+        echo hybris=$(sed -n -e 's/.* (\(.*\)).*$/\1/' -e 1p ubuntu/hybris/debian/changelog) >> $stamp
+        echo -e "\nAndroid repo head list:" >> $stamp
+        repo_dump_heads >> $stamp
+    fi
+}
+
+build_device() {
+    echo Building $1
+    create_build_stamp $1
+    brunch $1
+    if [ $? != 0 ]
+    then
+        echo Build for $1 failed
+        exit 1
+    fi 
+    mv $OUT/cm-10.1-*-$CM_BUILD.zip archive/$series-preinstalled-armel+$CM_BUILD.zip
+    mv $OUT/recovery.img archive/$series-preinstalled-recovery-armel+$CM_BUILD.img
+    mv $OUT/system.img archive/$series-preinstalled-system-armel+$CM_BUILD.img
+    mv $OUT/boot.img archive/$series-preinstalled-boot-armel+$CM_BUILD.img
+    sum_append $series-preinstalled-armel+$CM_BUILD.zip
+    sum_append $series-preinstalled-recovery-armel+$CM_BUILD.img
+    sum_append $series-preinstalled-system-armel+$CM_BUILD.img
+    sum_append $series-preinstalled-boot-armel+$CM_BUILD.img
+}
+
+create_userdata() {
+    tar=$tar_dir/$product.tar.gz
+    echo Creating user data for $tar
+    if [ ! -f "$tar" ]
+    then
+        echo $tar does not exist
+        exit 1
+    fi
+    if [ -z "$META_INF_DIR" ]
+    then
+        echo "set META_INF_DIR to the location of the META_INF"
+    fi
+    # Real userdata
+    ubuntu_data -m $META_INF_DIR -o $WORKSPACE/archive/$ubuntu_img $tar
+    sum_append $ubuntu_img
+}
+
+create_changelog() {
+    # Also copy the userdata manifest and setup the latest manifest
+    # link locally, to allow us to compare and generate the changelog
+    echo "Creating changelog file"
+    if [ ! -d $changelog_dir ]
+    then
+        mkdir $changelog_dir
+    fi
+    manifest=$changelog_dir/$product_$JENKINS_BUILD_NUMBER
+    cp $tar_dir/$product.manifest $manifest
+    old_manifest_link=$changelog_dir/$product.last
+    old_manifest=$(readlink $old_manifest_link 2>/dev/null)
+    week_changelog=$changelog_dir/week_changelog
+
+    # Clean the changelog when doing the first build of every tuesday
+    week_day=$(date +%u)
+    if [ -f $week_changelog ] && [ $week_day -eq 2 ]
+    then
+        # Make sure last stat modify date is not from today
+        today=$(date +%Y-%m-%d)
+        last_modify=$(stat $week_changelog | grep Modify | awk -F' ' '{print $2}')
+        if [ $today != $last_modify ]
+        then
+            rm -f $week_changelog
+        fi
+    fi
+
+    # Update changelog with current build
+    build_changelog=$(mktemp)
+    echo "Changelog for build $JENKINS_BUILD_NUMBER:" >> $build_changelog
+    echo -e "\nAndroid repo:" >> $build_changelog
+    if [ -s $android_changelog ]
+    then
+        cat $android_changelog >> $build_changelog
+    else
+        echo "No Android Changes" >> $build_changelog
+    fi
+    echo >> $build_changelog
+
+    # Generate the final changelog and update the week one
+    if [ -s $week_changelog ]
+    then
+        cat $week_changelog >> $build_changelog
+    fi
+    cp $build_changelog $week_changelog
+    cp $week_changelog $changelog
+
+    # Clean up tmp files
+    rm -f $build_changelog $android_changelog
+}
+
+if [ -d archive ]
+then
+    echo Removing previously archived components
+    rm -rf archive
+fi
+
+echo Creating archive directory
+mkdir archive
+
+if [ -n "$ubuntu_artifacts" ]; then
+    wget.real --no-proxy $ubuntu_artifacts
+    unzip archive.zip
+fi
+
+set -e
+echo Running repo sync
+export android_changelog=$(mktemp)
+repo sync 2>&1 | tee -a $android_changelog
+repo manifest -o android_manifest.xml -r
+# Clean empty lines as repo output is not so friendly
+sed -i '${/^$/d}' $android_changelog
+set +e
+
+. build/envsetup.sh
+
+if [ "$clobber" == "true" ]
+then
+    echo
+    echo Cleaning
+    echo
+    make clobber
+else
+    echo
+    echo Performing an incremental build
+    echo
+fi
+
+echo Updating bzr branches
+for dir in vendor/samsung vendor/lge vendor/audience vendor/broadcom vendor/nxp vendor/nvidia vendor/invensense vendor/elan vendor/widevine vendor/asus ubuntu/platform-api
+do
+    echo Trying to update $dir
+    if [ -d $dir ]
+    then
+         cd $dir
+         bzr pull
+         croot
+    fi
+done
+
+export timestamp=$(date +%Y%m%d)
+create_build_stamp
+cp $stamp archive
+create_changelog
+build_device manta
+build_device maguro
+build_device mako
+build_device grouper
+
+rm -rf archive/livebuild
