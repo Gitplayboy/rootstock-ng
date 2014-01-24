@@ -6,11 +6,9 @@ set -e
 # needs 6.5GB free diskspace for building
 
 # TODO:
-#       - option parsing
 #       - add "keep chroot" option
 #       - add logging
-#       - add x86 build
-#       - use timestamp in output files
+#       - use timestamp and arch in output files
 #       - allow PPAs to be added
 #       - allow single deb to be injected
 
