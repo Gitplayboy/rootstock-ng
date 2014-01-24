@@ -26,9 +26,11 @@ PROJECT="ubuntu-touch"
 
 cleanup()
 {
-	sudo umount $CHROOT/sys >/dev/null 2>&1 || true
-	sudo umount $CHROOT/proc >/dev/null 2>&1 || true
-	sudo rm -rf $CHROOT >/dev/null 2>&1 || true
+	if [ -e "$CHROOT" ]; then
+		sudo umount $CHROOT/sys >/dev/null 2>&1 || true
+		sudo umount $CHROOT/proc >/dev/null 2>&1 || true
+		sudo rm -rf $CHROOT >/dev/null 2>&1 || true
+	fi
 }
 
 trap cleanup 0 1 2 3 9 15
