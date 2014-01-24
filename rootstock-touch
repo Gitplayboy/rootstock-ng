@@ -7,12 +7,12 @@ set -e
 
 # TODO:
 #       - option parsing
-#       - keep chroot option
+#       - add "keep chroot" option
 #       - add logging
 #       - add x86 build
 #       - use timestamp in output files
 #       - allow PPAs to be added
-#       - allow single deb to be added
+#       - allow single deb to be injected
 
 LC_ALL=C
 
@@ -27,6 +27,8 @@ LB_BOOTSTRAP_QEMU_STATIC="/usr/bin/qemu-arm-static"
 PREINSTALLED="true"
 IMAGEFORMAT="plain"
 
+BOOTSTRAP_BIN="qemu-debootstrap --arch armhf"
+
 cleanup()
 {
 	sudo umount $CHROOT/sys || true
@@ -34,6 +36,15 @@ cleanup()
 }
 
 trap cleanup 0 1 2 3 9 15
+
+case $ARCH in
+	i386)
+		MIRROR="http://archive.ubuntu.com/ubuntu"
+		BOOTSTRAP_BIN="debootstrap --arch i386"
+		LB_BOOTSTRAP_QEMU_ARCHITECTURES=""
+		LB_BOOTSTRAP_QEMU_STATIC=""
+		;;
+esac
 
 BUILDOPTS="PREINSTALLED=${PREINSTALLED} \
 	LB_BOOTSTRAP_QEMU_ARCHITECTURES=${LB_BOOTSTRAP_QEMU_ARCHITECTURES} \
@@ -60,13 +71,14 @@ do_chroot()
 
 build_arm_chroot()
 {
-	sudo qemu-debootstrap --arch armhf $SUITE $CHROOT $MIRROR
+	sudo $BOOTSTRAP_BIN $SUITE $CHROOT $MIRROR
 	echo "deb $MIRROR $SUITE main universe" | sudo tee $CHROOT/etc/apt/sources.list
 	do_chroot $CHROOT "apt-get -y update"
 	do_chroot $CHROOT "apt-get -y install livecd-rootfs"
 	sudo mkdir -p $CHROOT/build
 	sudo chroot $CHROOT sh -c "cd /build && rm -rf auto && mkdir -p auto && \
 		for f in config build clean; do ln -s /usr/share/livecd-rootfs/live-build/auto/\$f auto/; done"
+	# hack for click package location
 	sudo sed -i 's,archive-team.internal,people.canonical.com/~ubuntu-archive,' \
 		$CHROOT/usr/share/livecd-rootfs/live-build/ubuntu-touch/hooks/60-install-click.chroot
 }
@@ -96,5 +108,5 @@ copy_artefacts()
 
 build_arm_chroot
 build_touch
-create_android_zip
+[ "$ARCH" = "armhf" ] && create_android_zip
 copy_artefacts
