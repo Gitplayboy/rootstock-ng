@@ -18,31 +18,36 @@ LC_ALL=C
 
 SUITE="trusty"
 MIRROR="http://192.168.2.125:9999/ubuntu-ports/"
-PROJECT="ubuntu-touch"
 ARCH="armhf"
+
 NOW=$(date +%Y%m%d)
 OUTDIR="./out"
-LB_BOOTSTRAP_QEMU_ARCHITECTURES="armhf"
-LB_BOOTSTRAP_QEMU_STATIC="/usr/bin/qemu-arm-static"
+
 PREINSTALLED="true"
 IMAGEFORMAT="plain"
-
-BOOTSTRAP_BIN="qemu-debootstrap --arch armhf"
+PROJECT="ubuntu-touch"
 
 cleanup()
 {
 	sudo umount $CHROOT/sys || true
 	sudo umount $CHROOT/proc || true
+	sudo rm -rf $CHROOT
 }
 
 trap cleanup 0 1 2 3 9 15
 
 case $ARCH in
 	i386)
-		MIRROR="http://archive.ubuntu.com/ubuntu"
+		MIRROR="${MIRROR:-http://archive.ubuntu.com/ubuntu}"
 		BOOTSTRAP_BIN="debootstrap --arch i386"
 		LB_BOOTSTRAP_QEMU_ARCHITECTURES=""
 		LB_BOOTSTRAP_QEMU_STATIC=""
+		;;
+	armhf)
+		MIRROR="${MIRROR:-http://ports.ubuntu.com/ubuntu-ports}"
+		BOOTSTRAP_BIN="qemu-debootstrap --arch armhf"
+		LB_BOOTSTRAP_QEMU_ARCHITECTURES="armhf"
+		LB_BOOTSTRAP_QEMU_STATIC="/usr/bin/qemu-arm-static"
 		;;
 esac
 
