@@ -115,7 +115,7 @@ do_chroot()
 	chroot $ROOT umount /proc
 }
 
-build_arm_chroot()
+build_chroot()
 {
 	$BOOTSTRAP_BIN $SUITE $CHROOT $MIRROR
 	echo "deb $MIRROR $SUITE main universe" >$CHROOT/etc/apt/sources.list
@@ -152,7 +152,7 @@ copy_artefacts()
 	done
 }
 
-build_arm_chroot
+build_chroot
 build_touch
 [ "$ARCH" = "armhf" ] && create_android_zip
 copy_artefacts
