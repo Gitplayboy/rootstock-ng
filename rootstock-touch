@@ -45,7 +45,7 @@ BUILDOPTS="PREINSTALLED=${PREINSTALLED} \
 	PROJECT=${PROJECT} \
 	ARCH=${ARCH}"
 
-CHROOT=$(mktemp -d rootstock.XXX)
+CHROOT=$(mktemp -d /tmp/rootstock.XXXXX)
 
 do_chroot()
 {
