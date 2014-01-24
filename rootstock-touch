@@ -19,6 +19,7 @@ ARCH="armhf"
 
 NOW=$(date +%Y%m%d)
 OUTDIR="./out"
+SUDOARGS="$@"
 
 PREINSTALLED="true"
 IMAGEFORMAT="plain"
@@ -27,9 +28,9 @@ PROJECT="ubuntu-touch"
 cleanup()
 {
 	if [ -e "$CHROOT" ]; then
-		sudo umount $CHROOT/sys >/dev/null 2>&1 || true
-		sudo umount $CHROOT/proc >/dev/null 2>&1 || true
-		sudo rm -rf $CHROOT >/dev/null 2>&1 || true
+		umount $CHROOT/sys >/dev/null 2>&1 || true
+		umount $CHROOT/proc >/dev/null 2>&1 || true
+		rm -rf $CHROOT >/dev/null 2>&1 || true
 	fi
 }
 
@@ -98,43 +99,47 @@ BUILDOPTS="PREINSTALLED=${PREINSTALLED} \
 	PROJECT=${PROJECT} \
 	ARCH=${ARCH}"
 
+if [ ! $(id -u) -eq 0 ]; then
+	exec sudo $0 $SUDOARGS
+fi
+
 CHROOT=$(mktemp -d /tmp/rootstock.XXXXX)
 
 do_chroot()
 {
 	ROOT="$1"
 	CMD="$2"
-	sudo chroot $ROOT mount -t proc proc /proc
-	sudo chroot $ROOT mount -t sysfs sys /sys
-	sudo -E chroot $ROOT $CMD
-	sudo chroot $ROOT umount /sys
-	sudo chroot $ROOT umount /proc
+	chroot $ROOT mount -t proc proc /proc
+	chroot $ROOT mount -t sysfs sys /sys
+	chroot $ROOT $CMD
+	chroot $ROOT umount /sys
+	chroot $ROOT umount /proc
 }
 
 build_arm_chroot()
 {
-	sudo $BOOTSTRAP_BIN $SUITE $CHROOT $MIRROR
-	echo "deb $MIRROR $SUITE main universe" | sudo tee $CHROOT/etc/apt/sources.list
+	$BOOTSTRAP_BIN $SUITE $CHROOT $MIRROR
+	echo "deb $MIRROR $SUITE main universe" >$CHROOT/etc/apt/sources.list
 	do_chroot $CHROOT "apt-get -y update"
 	do_chroot $CHROOT "apt-get -y install livecd-rootfs"
-	sudo mkdir -p $CHROOT/build
-	sudo chroot $CHROOT sh -c "cd /build && rm -rf auto && mkdir -p auto && \
+	mkdir -p $CHROOT/build
+	chroot $CHROOT sh -c "cd /build && rm -rf auto && mkdir -p auto && \
 		for f in config build clean; do ln -s /usr/share/livecd-rootfs/live-build/auto/\$f auto/; done"
 	# hack for click package location
-	sudo sed -i 's,archive-team.internal,people.canonical.com/~ubuntu-archive,' \
+	sed -i 's,archive-team.internal,people.canonical.com/~ubuntu-archive,' \
 		$CHROOT/usr/share/livecd-rootfs/live-build/ubuntu-touch/hooks/60-install-click.chroot
 }
 
 build_touch()
 {
-	sudo chroot $CHROOT sh -c "cd /build && lb clean --purge"
-	sudo chroot $CHROOT sh -c "cd /build && $BUILDOPTS lb config"
-	sudo chroot $CHROOT sh -c "cd /build && $BUILDOPTS lb build"
+	chroot $CHROOT sh -c "cd /build && lb clean --purge"
+	chroot $CHROOT sh -c "cd /build && $BUILDOPTS lb config"
+	chroot $CHROOT sh -c "cd /build && $BUILDOPTS lb build"
 }
 
 create_android_zip()
 {
-	sudo ./phablet-build-scripts/ubuntu_data \
+	./phablet-build-scripts/ubuntu_data \
 		-m phablet-build-scripts/META-INF \
 		$CHROOT/build/livecd.ubuntu-touch.rootfs.tar.gz \
 		-o livecd.ubuntu-touch.rootfs.zip
