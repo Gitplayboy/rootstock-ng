@@ -14,10 +14,9 @@ set -e
 #       - allow PPAs to be added
 #       - allow single deb to be injected
 
-LC_ALL=C
+export LC_ALL=C
 
 SUITE="trusty"
-MIRROR="http://192.168.2.125:9999/ubuntu-ports/"
 ARCH="armhf"
 
 NOW=$(date +%Y%m%d)
@@ -29,12 +28,47 @@ PROJECT="ubuntu-touch"
 
 cleanup()
 {
-	sudo umount $CHROOT/sys || true
-	sudo umount $CHROOT/proc || true
-	sudo rm -rf $CHROOT
+	sudo umount $CHROOT/sys >/dev/null 2>&1 || true
+	sudo umount $CHROOT/proc >/dev/null 2>&1 || true
+	sudo rm -rf $CHROOT >/dev/null 2>&1 || true
 }
 
 trap cleanup 0 1 2 3 9 15
+
+usage()
+{
+	echo "usage: $(basename $0)\n
+	-h|--help		this page
+	-a|--arch (i386|armhf)	pick an arch, default: armhf
+	-m|--mirror (url)	url to local mirror
+	-o|--outdir (dir)	output dir, default: ./out\n"
+#	-k|--keep-chroot
+#	-i|--inject-package
+#	-p|--ppa-sources
+#	-g|--ppa-gpg-key
+	exit 1
+}
+
+while [ $# -gt 0 ]; do
+	case "$1" in
+		-h|--help)
+			usage
+			;;
+		-a|--arch)
+			[ -n "$2" ] && ARCH=$2 shift || usage
+			;;
+		-m|--mirror)
+			[ -n "$2" ] && MIRROR=$2 shift || usage
+			;;
+		-o|--outdir)
+			[ -n "$2" ] && OUTDIR=$2 shift || usage
+			;;
+		*)
+			usage
+			;;
+	esac
+	shift
+done
 
 case $ARCH in
 	i386)
@@ -48,6 +82,9 @@ case $ARCH in
 		BOOTSTRAP_BIN="qemu-debootstrap --arch armhf"
 		LB_BOOTSTRAP_QEMU_ARCHITECTURES="armhf"
 		LB_BOOTSTRAP_QEMU_STATIC="/usr/bin/qemu-arm-static"
+		;;
+	*)
+		usage
 		;;
 esac
 
