@@ -19,7 +19,6 @@ ARCH="armhf"
 
 NOW=$(date +%Y%m%d)
 OUTDIR="./out"
-SUDOARGS="$@"
 
 PREINSTALLED="true"
 IMAGEFORMAT="plain"
@@ -49,6 +48,8 @@ usage()
 #	-g|--ppa-gpg-key
 	exit 1
 }
+
+SUDOARGS="$@"
 
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -99,9 +100,7 @@ BUILDOPTS="PREINSTALLED=${PREINSTALLED} \
 	PROJECT=${PROJECT} \
 	ARCH=${ARCH}"
 
-if [ ! $(id -u) -eq 0 ]; then
-	exec sudo $0 $SUDOARGS
-fi
+[ $(id -u) -ne 0 ] && exec sudo $0 $SUDOARGS
 
 CHROOT=$(mktemp -d /tmp/rootstock.XXXXX)
 
