@@ -147,7 +147,7 @@ create_android_zip()
 copy_artefacts()
 {
 	mkdir -p $OUTDIR
-	for file in $(ls $CHROOT/build/livecd.*|grep -v .img); do
+	for file in $(ls $CHROOT/build/livecd.*); do
 		cp $file $OUTDIR/$(echo $file|sed s/^.*livecd.//)
 	done
 }
