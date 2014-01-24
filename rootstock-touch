@@ -1,0 +1,88 @@
+#!/bin/sh
+
+set -e
+
+# requires zip, qemu-user-static (for qemu-debootstrap)
+# needs 6.5GB free diskspace for building
+
+CHROOT="/tmp/chroot"
+SUITE="trusty"
+MIRROR="http://192.168.2.125:9999/ubuntu-ports/"
+PROJECT="ubuntu-touch"
+ARCH="armhf"
+NOW=$(date +%Y%m%d)
+OUTDIR="./out"
+LB_BOOTSTRAP_QEMU_ARCHITECTURES="armhf"
+LB_BOOTSTRAP_QEMU_STATIC="/usr/bin/qemu-arm-static"
+PREINSTALLED="true"
+IMAGEFORMAT="plain"
+
+cleanup()
+{
+	sudo umount $CHROOT/sys || true
+	sudo umount $CHROOT/proc || true
+}
+
+trap cleanup 0 1 2 3 9 15
+
+BUILDOPTS="PREINSTALLED=${PREINSTALLED} \
+	LB_BOOTSTRAP_QEMU_ARCHITECTURES=${LB_BOOTSTRAP_QEMU_ARCHITECTURES} \
+	LB_BOOTSTRAP_QEMU_STATIC=${LB_BOOTSTRAP_QEMU_STATIC} \
+	IMAGEFORMAT=${IMAGEFORMAT} \
+	MIRROR=${MIRROR} \
+	NOW=${NOW} \
+	SUITE=${SUITE} \
+	PROJECT=${PROJECT} \
+	ARCH=${ARCH}"
+
+do_chroot()
+{
+	ROOT="$1"
+	CMD="$2"
+	sudo chroot $ROOT mount -t proc proc /proc
+	sudo chroot $ROOT mount -t sysfs sys /sys
+	sudo -E chroot $ROOT $CMD
+	sudo chroot $ROOT umount /sys
+	sudo chroot $ROOT umount /proc
+}
+
+build_arm_chroot()
+{
+	sudo qemu-debootstrap --arch armhf $SUITE $CHROOT $MIRROR
+	echo "deb $MIRROR $SUITE main universe" | sudo tee $CHROOT/etc/apt/sources.list
+	do_chroot $CHROOT "apt-get -y update"
+	do_chroot $CHROOT "apt-get -y install livecd-rootfs"
+	sudo mkdir -p $CHROOT/build
+	sudo chroot $CHROOT sh -c "cd /build && rm -rf auto && mkdir -p auto && \
+		for f in config build clean; do ln -s /usr/share/livecd-rootfs/live-build/auto/\$f auto/; done"
+	sudo sed -i 's,archive-team.internal,people.canonical.com/~ubuntu-archive,' \
+		$CHROOT/usr/share/livecd-rootfs/live-build/ubuntu-touch/hooks/60-install-click.chroot
+}
+
+build_touch()
+{
+	sudo chroot $CHROOT sh -c "cd /build && lb clean --purge"
+	sudo chroot $CHROOT sh -c "cd /build && $BUILDOPTS lb config"
+	sudo chroot $CHROOT sh -c "cd /build && $BUILDOPTS lb build"
+}
+
+create_android_zip()
+{
+	sudo ./phablet-build-scripts/ubuntu_data \
+		-m phablet-build-scripts/META-INF \
+		$CHROOT/build/livecd.ubuntu-touch.rootfs.tar.gz \
+		-o livecd.ubuntu-touch.rootfs.zip
+}
+
+copy_artefacts()
+{
+	mkdir -p $OUTDIR
+	for file in $(ls $CHROOT/build/livecd.*|grep -v .img); do
+		cp $file $OUTDIR/$(echo $file|sed s/^.*livecd.//)
+	done
+}
+
+build_arm_chroot
+build_touch
+create_android_zip
+copy_artefacts
