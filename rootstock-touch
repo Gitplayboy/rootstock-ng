@@ -6,7 +6,6 @@ set -e
 # needs 6.5GB free diskspace for building
 
 # TODO:
-#       - allow PPAs to be added
 #       - allow single deb to be injected
 
 export LC_ALL=C
@@ -18,6 +17,7 @@ NOW=$(date +%Y%m%d)
 OUTDIR="./out-$NOW"
 TAILPID=
 KEEP=
+DO_PPA=
 
 PREINSTALLED="true"
 IMAGEFORMAT="plain"
@@ -47,10 +47,9 @@ usage()
 	-a|--arch (i386|armhf)	pick an arch, default: armhf
 	-m|--mirror (url)	url to local mirror
 	-o|--outdir (dir)	output dir, default: ./out-\$timestamp
-	-k|--keep-chroot	keep the build environment around for inspection\n"
+	-k|--keep-chroot	keep the build environment around for inspection
+	-p|--ppa (ppa url)	a ppa url in the form of ppa:user/ppaname\n"
 #	-i|--inject-package (path to deb)	inject a single .deb in the build
-#	-p|--ppa-sources
-#	-g|--ppa-gpg-key
 	exit 1
 }
 
@@ -72,6 +71,13 @@ while [ $# -gt 0 ]; do
 			;;
 		-k|--keep-chroot)
 			KEEP=1
+			;;
+		-p|--ppa)
+			[ -n "$2" ] && PPAOPT=$2 shift || usage
+			MYPPA=$(echo $PPAOPT|sed 's/^.*://')
+			PPA_USER=${MYPPA%%/*}
+			PPA_NAME=${MYPPA##*/}
+			DO_PPA=1
 			;;
 		*)
 			usage
@@ -129,6 +135,21 @@ do_chroot()
 	chroot $ROOT umount /proc
 }
 
+set_up_ppa()
+{
+	PPA_API="https://launchpad.net/api/1.0/~$PPA_USER/+archive/$PPA_NAME"
+	PPA_FINGERPRINT="$(wget -O- -q $PPA_API|tr ',' '\n'|\
+		grep signing_key_fingerprint|\
+		sed s/\"//g|tail -c9)"
+	KEY_URL="http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x$PPA_FINGERPRINT"
+	KEY=$(wget -O- -q $KEY_URL|sed -e '/-----/,$!d'|sed '/^<.*/d')
+	PPA_CONFDIR="$CHROOT/usr/share/livecd-rootfs/live-build/ubuntu-touch/archives"
+	mkdir -p "$PPA_CONFDIR"
+	echo "$KEY" >"$PPA_CONFDIR/$PPA_USER-$PPA_NAME.key.chroot"
+	PPA_SOURCESLIST="deb http://ppa.launchpad.net/$PPA_USER/$PPA_NAME/ubuntu $SUITE main"
+	echo "$PPA_SOURCESLIST" >"$PPA_CONFDIR/$PPA_USER-$PPA_NAME.list.chroot"
+}
+
 build_chroot()
 {
 	$BOOTSTRAP_BIN $SUITE $CHROOT $MIRROR
@@ -167,6 +188,7 @@ copy_artefacts()
 }
 
 build_chroot
+[ -n "$DO_PPA" ] && set_up_ppa
 build_touch
 [ "$ARCH" = "armhf" ] && create_android_zip
 copy_artefacts
