@@ -6,7 +6,6 @@ set -e
 # needs 6.5GB free diskspace for building
 
 # TODO:
-#       - add logging
 #       - allow PPAs to be added
 #       - allow single deb to be injected
 
@@ -17,6 +16,7 @@ ARCH="armhf"
 
 NOW=$(date +%Y%m%d)
 OUTDIR="./out-$NOW"
+TAILPID=
 KEEP=
 
 PREINSTALLED="true"
@@ -25,9 +25,15 @@ PROJECT="ubuntu-touch"
 
 cleanup()
 {
+	[ -n "$TAILPID" ] && kill -9 $TAILPID
 	if [ -e "$CHROOT" ]; then
 		umount $CHROOT/sys >/dev/null 2>&1 || true
 		umount $CHROOT/proc >/dev/null 2>&1 || true
+		if [ -e "$CHROOT/build.log" ]; then
+			LOG=./build-$NOW.log
+			[ -e "$OUTDIR" ] && LOG=$OUTDIR/build-$NOW.log
+			cp $CHROOT/build.log $LOG
+		fi
 		[ -z "$KEEP" ] && rm -rf $CHROOT >/dev/null 2>&1 || true
 	fi
 }
@@ -42,7 +48,7 @@ usage()
 	-m|--mirror (url)	url to local mirror
 	-o|--outdir (dir)	output dir, default: ./out-\$timestamp
 	-k|--keep-chroot	keep the build environment around for inspection\n"
-#	-i|--inject-package
+#	-i|--inject-package (path to deb)	inject a single .deb in the build
 #	-p|--ppa-sources
 #	-g|--ppa-gpg-key
 	exit 1
@@ -105,6 +111,12 @@ BUILDOPTS="PREINSTALLED=${PREINSTALLED} \
 [ $(id -u) -ne 0 ] && exec sudo $0 $SUDOARGS
 
 CHROOT=$(mktemp -d /tmp/rootstock.XXXXX)
+
+touch $CHROOT/build.log
+tail -f $CHROOT/build.log &
+TAILPID=$!
+
+exec 3>&1 4>&2 >$CHROOT/build.log 2>&1
 
 do_chroot()
 {
