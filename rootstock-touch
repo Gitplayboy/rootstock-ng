@@ -30,8 +30,8 @@ cleanup()
 		umount $CHROOT/sys >/dev/null 2>&1 || true
 		umount $CHROOT/proc >/dev/null 2>&1 || true
 		if [ -e "$CHROOT/build.log" ]; then
-			LOG=./build-$NOW.log
-			[ -e "$OUTDIR" ] && LOG=$OUTDIR/build-$NOW.log
+			LOG=./build-$NOW-$ARCH.log
+			[ -e "$OUTDIR" ] && LOG=$OUTDIR/build-$NOW-$ARCH.log
 			cp $CHROOT/build.log $LOG
 		fi
 		[ -z "$KEEP" ] && rm -rf $CHROOT >/dev/null 2>&1 || true
