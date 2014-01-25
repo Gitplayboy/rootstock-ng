@@ -6,9 +6,7 @@ set -e
 # needs 6.5GB free diskspace for building
 
 # TODO:
-#       - add "keep chroot" option
 #       - add logging
-#       - use timestamp and arch in output files
 #       - allow PPAs to be added
 #       - allow single deb to be injected
 
@@ -18,7 +16,8 @@ SUITE="trusty"
 ARCH="armhf"
 
 NOW=$(date +%Y%m%d)
-OUTDIR="./out"
+OUTDIR="./out-$NOW"
+KEEP=
 
 PREINSTALLED="true"
 IMAGEFORMAT="plain"
@@ -29,7 +28,7 @@ cleanup()
 	if [ -e "$CHROOT" ]; then
 		umount $CHROOT/sys >/dev/null 2>&1 || true
 		umount $CHROOT/proc >/dev/null 2>&1 || true
-		rm -rf $CHROOT >/dev/null 2>&1 || true
+		[ -z "$KEEP" ] && rm -rf $CHROOT >/dev/null 2>&1 || true
 	fi
 }
 
@@ -41,8 +40,8 @@ usage()
 	-h|--help		this page
 	-a|--arch (i386|armhf)	pick an arch, default: armhf
 	-m|--mirror (url)	url to local mirror
-	-o|--outdir (dir)	output dir, default: ./out\n"
-#	-k|--keep-chroot
+	-o|--outdir (dir)	output dir, default: ./out-\$timestamp
+	-k|--keep-chroot	keep the build environment around for inspection\n"
 #	-i|--inject-package
 #	-p|--ppa-sources
 #	-g|--ppa-gpg-key
@@ -64,6 +63,9 @@ while [ $# -gt 0 ]; do
 			;;
 		-o|--outdir)
 			[ -n "$2" ] && OUTDIR=$2 shift || usage
+			;;
+		-k|--keep-chroot)
+			KEEP=1
 			;;
 		*)
 			usage
@@ -148,7 +150,7 @@ copy_artefacts()
 {
 	mkdir -p $OUTDIR
 	for file in $(ls $CHROOT/build/livecd.*|grep -v bootimg); do
-		cp $file $OUTDIR/$(echo $file|sed s/^.*livecd.//)
+		cp $file $OUTDIR/$(echo $file|sed -e s/^.*livecd.// -e s/rootfs/rootfs-$ARCH/)
 	done
 }
 
