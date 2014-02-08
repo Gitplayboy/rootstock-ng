@@ -1,0 +1,29 @@
+To install an ubuntu system-image to a device, you need a cdimage rootfs
+tarball for ubuntu touch devices (you can create the tarball with the
+rootstock-touch tool shipped along with the rootstock-touch-installer
+script or you can directly download one from:
+
+http://cdimage.ubuntu.com/ubuntu-touch/daily-preinstalled/current/trusty-preinstalled-touch-armhf.tar.gz
+
+Additionally to the ubuntu rootfs you need an android system.img which
+will be used for the lxc container that provides the hardware abstraction
+layer used by ubuntu touch. This tarball is usually created by building
+the android tree for your device based on the git tree from
+http://phablet.ubuntu.com (please see the porting guide at
+https://wiki.ubuntu.com/Touch/Porting for details on creating andorid
+images for your device.)
+
+Make sure you have the android-tools-adb and android-tools-fsutils
+packages installed before running rootsotck-touch-install
+
+Once you have both files available run rootsotck-touch-install like:
+
+./rootsotck-touch-install ./trusty-prtrusty-preinstalled-touch-armhf.tar.gz ./system.img
+
+(the above example assumes you have both files in the rootstock-ng tree)
+
+rootstock-touch-install knows an option to keep the userdata
+(/home/phablet/) untouched, in case you only want to install a system
+upgrade.
+
+Note that by default everything gets wiped !.
