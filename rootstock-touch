@@ -2,9 +2,7 @@
 
 set -e
 
-# requires zip, qemu-user-static (for qemu-debootstrap)
 # needs 6.5GB free diskspace for building
-
 # TODO:
 #       - allow single deb to be injected
 
@@ -22,6 +20,8 @@ DO_PPA=
 PREINSTALLED="true"
 IMAGEFORMAT="plain"
 PROJECT="ubuntu-touch"
+
+[ ! $(which qemu-debootstrap) ] && echo "please install the qemu-user-static package" && exit 1
 
 cleanup()
 {
@@ -171,14 +171,6 @@ build_touch()
 	chroot $CHROOT sh -c "cd /build && $BUILDOPTS lb build"
 }
 
-create_android_zip()
-{
-	./phablet-build-scripts/ubuntu_data \
-		-m phablet-build-scripts/META-INF \
-		$CHROOT/build/livecd.ubuntu-touch.rootfs.tar.gz \
-		-o livecd.ubuntu-touch.rootfs.zip
-}
-
 copy_artefacts()
 {
 	mkdir -p $OUTDIR
@@ -190,5 +182,4 @@ copy_artefacts()
 build_chroot
 [ -n "$DO_PPA" ] && set_up_ppa
 build_touch
-[ "$ARCH" = "armhf" ] && create_android_zip
 copy_artefacts
