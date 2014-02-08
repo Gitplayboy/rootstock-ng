@@ -1,3 +1,6 @@
+Make sure you have the android-tools-adb, android-tools-fsutils and
+android-tools-fastboot packages installed before running the script.
+
 To install an ubuntu system-image to a device, you need a cdimage rootfs
 tarball for ubuntu touch devices (you can create the tarball with the
 rootstock-touch tool shipped along with the rootstock-touch-installer
@@ -5,24 +8,30 @@ script or you can directly download one from:
 
 http://cdimage.ubuntu.com/ubuntu-touch/daily-preinstalled/current/trusty-preinstalled-touch-armhf.tar.gz
 
-Additionally to the ubuntu rootfs you need an android system.img which
-will be used for the lxc container that provides the hardware abstraction
-layer used by ubuntu touch. This tarball is usually created by building
-the android tree for your device based on the git tree from
+Additionally to the ubuntu rootfs you need android system.img, boot.img
+and recovery.img which will be used for the lxc container that provides
+the hardware abstraction layer used by ubuntu touch. These img files are
+usually created by building the android tree for your device based on
+the git tree from
 http://phablet.ubuntu.com (please see the porting guide at
 https://wiki.ubuntu.com/Touch/Porting for details on creating andorid
 images for your device.)
 
-Make sure you have the android-tools-adb and android-tools-fsutils
-packages installed before running rootsotck-touch-install
+To prepare your device you now need to put it into bootloader mode.
+First flash the boot.img and recovery.img files with fastboot:
 
-Once you have both files available run rootsotck-touch-install like:
+fastboot flash recovery /path/to/recovery.img
+fastboot flash boot /path/to/boot.img
 
-./rootsotck-touch-install ./trusty-prtrusty-preinstalled-touch-armhf.tar.gz ./system.img
+Now select "Boot to Recovery" (or similar) in the bootloader menu
 
-(the above example assumes you have both files in the rootstock-ng tree)
+Once the device booted into recovery mode run rootsotck-touch-install:
 
-rootstock-touch-install knows an option to keep the userdata
+./rootsotck-touch-install ./trusty-trusty-preinstalled-touch-armhf.tar.gz ./system.img
+
+(the above example assumes the needed files are in the current dir)
+
+rootstock-touch-install knows an option (-k) to keep the user data
 (/home/phablet/) untouched, in case you only want to install a system
 upgrade.
 
