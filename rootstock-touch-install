@@ -66,6 +66,7 @@ usage()
 	echo "usage: $(basename $0) <path to rootfs tarball> <path to android system.img> [options]\n
 	options:
 	-h|--help		this message
+	-c|--custom		path to customization tarball (needs to be tar.xz)
 	-k|--keep-userdata	do not wipe user data on device\n"
 	exit 1
 }
@@ -77,6 +78,8 @@ while [ $# -gt 0 ]; do
 		-h|--help)
 			usage
 			;;
+		-c|--custom)
+			[ -n "$2" ] && CUST_TARPATH=$2 shift || usage
 		-k|--keep-userdata)
 			KEEP=1
 			;;
@@ -90,6 +93,12 @@ if [ -z "$TARBALL" ] || [ -z "$SYSIMG" ] || \
 	[ "$(file --mime-type $TARPATH|sed 's/^.* //')" != "application/gzip" ] || \
 	[ "$(file --mime-type $SYSIMG|sed 's/^.* //')" != "application/octet-stream" ]; then
 	echo "need valid tarball and system.img paths"
+	usage
+fi
+
+if [ ! -z $CUST_TARPATH ] && \
+	[  "$(file --mime-type $CUST_TARPATH|sed 's/^.* //')" != "application/x-xz" ]; then
+	echo "Custom tarball needs to be .tar.xz"
 	usage
 fi
 
@@ -109,9 +118,23 @@ echo -n "transfering rootfs tarball ... "
 adb push $TARPATH /recovery/ >/dev/null 2>&1
 echo "[done]"
 
+if [ ! -z $CUST_TARPATH ]; then
+	CUST_TARBALL=$(basename $CUST_TARPATH)
+	echo  -n "transferring custom tarball"
+	adb push $CUST_TARPATH /recovery/ >/dev/null 2>&1
+	echo "[done]"
+fi
+
 echo -n "preparing system-image on device ... "
 prepare_ubuntu_system
 echo "[done]"
+
+if [ ! -z $CUST_TARPATH ];then
+	echo -n "unpacking custom tarball"
+	do_shell "mkdir -p /cache/system/custom"
+	do_shell "cd /cache && xzcat /recovery/$CUST_TARBALL | tar xf -"
+	echo "[done]"
+fi
 
 echo -n "unpacking rootfs tarball to system-image ... "
 do_shell "cd /cache/system && zcat /recovery/$TARBALL | tar xf -"
