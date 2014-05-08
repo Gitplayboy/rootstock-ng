@@ -68,7 +68,8 @@ usage()
 	-m|--mirror (url)	url to local mirror
 	-o|--outdir (dir)	output dir, default: ./out-\$timestamp
 	-k|--keep-chroot	keep the build environment around for inspection
-	-p|--ppa (ppa url)	a ppa url in the form of ppa:user/ppaname\n"
+	-p|--ppa (ppa url)	a ppa url in the form of ppa:user/ppaname
+	-s|--series		Ubuntu distro series\n"
 #	-i|--inject-package (path to deb)	inject a single .deb in the build
 	exit 1
 }
@@ -98,6 +99,9 @@ while [ $# -gt 0 ]; do
 			PPA_USER=${MYPPA%%/*}
 			PPA_NAME=${MYPPA##*/}
 			DO_PPA=1
+			;;
+		-s|--series)
+			[ -n "$2" ] && SUITE=$2 shift || usage
 			;;
 		*)
 			usage
