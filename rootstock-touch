@@ -28,7 +28,7 @@ set -e
 
 export LC_ALL=C
 
-SUITE="trusty"
+SUITE="vivid"
 ARCH="armhf"
 
 NOW=$(date +%Y%m%d)
@@ -115,9 +115,9 @@ while [ $# -gt 0 ]; do
 done
 
 case $ARCH in
-	i386)
+	i386|amd64)
 		MIRROR="${MIRROR:-http://archive.ubuntu.com/ubuntu}"
-		BOOTSTRAP_BIN="debootstrap --arch i386"
+		BOOTSTRAP_BIN="debootstrap --arch $ARCH"
 		LB_BOOTSTRAP_QEMU_ARCHITECTURES=""
 		LB_BOOTSTRAP_QEMU_STATIC=""
 		;;
@@ -132,7 +132,19 @@ case $ARCH in
 		;;
 esac
 
-BUILDOPTS="PREINSTALLED=${PREINSTALLED} \
+case $PROJECT in
+	ubuntu-core)
+		SUBPROJECT=system-image
+		EXTRA_PPAS=snappy-dev/image
+		;;
+	ubuntu-touch)
+		[ "SUITE" = "vivid" ] && EXTRA_PPAS="ci-train-ppa-service/stable-phone-overlay:1001"
+		;;
+esac
+
+BUILDOPTS="SUBPROJECT=${SUBPROJECT} \
+	EXTRA_PPAS=${EXTRA_PPAS} \
+	PREINSTALLED=${PREINSTALLED} \
 	LB_BOOTSTRAP_QEMU_ARCHITECTURES=${LB_BOOTSTRAP_QEMU_ARCHITECTURES} \
 	LB_BOOTSTRAP_QEMU_STATIC=${LB_BOOTSTRAP_QEMU_STATIC} \
 	IMAGEFORMAT=${IMAGEFORMAT} \
