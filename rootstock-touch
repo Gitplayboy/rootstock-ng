@@ -69,7 +69,8 @@ usage()
 	-o|--outdir (dir)	output dir, default: ./out-\$timestamp
 	-k|--keep-chroot	keep the build environment around for inspection
 	-p|--ppa (ppa url)	a ppa url in the form of ppa:user/ppaname
-	-s|--series		Ubuntu distro series\n"
+	-s|--series		Ubuntu distro series
+	-t|--type		project type (ubuntu-touch|ubuntu-core)\n"
 #	-i|--inject-package (path to deb)	inject a single .deb in the build
 	exit 1
 }
@@ -102,6 +103,9 @@ while [ $# -gt 0 ]; do
 			;;
 		-s|--series)
 			[ -n "$2" ] && SUITE=$2 shift || usage
+			;;
+		-t|--type)
+			[ -n "$2" ] && PROJECT=$2 shift || usage
 			;;
 		*)
 			usage
