@@ -123,7 +123,7 @@ case $ARCH in
 		;;
 	armhf)
 		MIRROR="${MIRROR:-http://ports.ubuntu.com/ubuntu-ports}"
-		BOOTSTRAP_BIN="qemu-debootstrap --arch armhf"
+		BOOTSTRAP_BIN="qemu-debootstrap --arch armhf --variant=minbase"
 		LB_BOOTSTRAP_QEMU_ARCHITECTURES="armhf"
 		LB_BOOTSTRAP_QEMU_STATIC="/usr/bin/qemu-arm-static"
 		;;
@@ -194,6 +194,7 @@ build_chroot()
 {
 	$BOOTSTRAP_BIN $SUITE $CHROOT $MIRROR
 	echo "deb $MIRROR $SUITE main universe" >$CHROOT/etc/apt/sources.list
+	echo "deb $MIRROR $SUITE-updates main universe" >>$CHROOT/etc/apt/sources.list
 	do_chroot $CHROOT "apt-get -y update"
 	do_chroot $CHROOT "apt-get -y install livecd-rootfs"
 	mkdir -p $CHROOT/build
