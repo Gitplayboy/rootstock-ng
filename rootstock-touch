@@ -1,6 +1,7 @@
 #!/bin/sh
 #
 #  Copyright (c) 2014 Canonical
+#  Copyright (c) 2017 The UBports Project
 #
 #  Author: Oliver Grawert <ogra@canonical.com>
 #
@@ -28,7 +29,7 @@ set -e
 
 export LC_ALL=C
 
-SUITE="vivid"
+SUITE="xenial"
 ARCH="armhf"
 
 NOW=$(date +%Y%m%d)
@@ -39,7 +40,7 @@ DO_PPA=
 
 PREINSTALLED="true"
 IMAGEFORMAT="plain"
-PROJECT="ubuntu-touch"
+PROJECT_="ubports-touch"
 
 [ ! $(which qemu-debootstrap) ] && echo "please install the qemu-user-static package" && exit 1
 
@@ -70,7 +71,7 @@ usage()
 	-k|--keep-chroot	keep the build environment around for inspection
 	-p|--ppa (ppa url)	a ppa url in the form of ppa:user/ppaname
 	-s|--series		Ubuntu distro series
-	-t|--type		project type (ubuntu-touch|ubuntu-core)\n"
+	-t|--type		project type (ubports-touch|ubuntu-touch|ubuntu-core)\n"
 #	-i|--inject-package (path to deb)	inject a single .deb in the build
 	exit 1
 }
@@ -105,7 +106,7 @@ while [ $# -gt 0 ]; do
 			[ -n "$2" ] && SUITE=$2 shift || usage
 			;;
 		-t|--type)
-			[ -n "$2" ] && PROJECT=$2 shift || usage
+			[ -n "$2" ] && PROJECT_=$2 shift || usage
 			;;
 		*)
 			usage
@@ -132,13 +133,19 @@ case $ARCH in
 		;;
 esac
 
-case $PROJECT in
+case $PROJECT_ in
 	ubuntu-core)
 		SUBPROJECT=system-image
 		EXTRA_PPAS=snappy-dev/image
+		PROJECT=$PROJECT_
 		;;
 	ubuntu-touch)
-		[ "SUITE" = "vivid" ] && EXTRA_PPAS="ci-train-ppa-service/stable-phone-overlay:1001"
+		[ "SUITE" = "vivid" ] || [ "SUITE" = "xenial"  ] && EXTRA_PPAS="ci-train-ppa-service/stable-phone-overlay:1001"
+		PROJECT=$PROJECT_
+		;;
+	ubports-touch)
+		[ "SUITE" = "vivid" ] || [ "SUITE" = "xenial"  ] && EXTRA_PPAS="ci-train-ppa-service/stable-phone-overlay:1001"
+		PROJECT="ubuntu-touch"
 		;;
 esac
 
@@ -193,6 +200,7 @@ set_up_ppa()
 build_chroot()
 {
 	$BOOTSTRAP_BIN $SUITE $CHROOT $MIRROR
+	echo "nameserver 8.8.8.8" >$CHROOT/etc/resolv.conf
 	echo "deb $MIRROR $SUITE main universe" >$CHROOT/etc/apt/sources.list
 	echo "deb $MIRROR $SUITE-updates main universe" >>$CHROOT/etc/apt/sources.list
 	do_chroot $CHROOT "apt-get -y update"
