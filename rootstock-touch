@@ -44,8 +44,6 @@ PROJECT_="ubports-touch"
 HOSTARCH=$(dpkg-architecture -qDEB_HOST_ARCH)
 CHROOT=$(mktemp -d /tmp/rootstock.XXXXX)
 
-[ ! $(which qemu-debootstrap) ] && echo "please install the qemu-user-static package" && exit 1
-
 cleanup()
 {
 	[ -n "$TAILPID" ] && kill -9 $TAILPID
@@ -146,6 +144,7 @@ case $ARCH in
 				LB_BOOTSTRAP_QEMU_STATIC=""
 				;;
 			*)
+				[ ! $(which qemu-debootstrap) ] && echo "please install the qemu-user-static package" && exit 1
 				MIRROR="${MIRROR:-http://ports.ubuntu.com/ubuntu-ports}"
 				BOOTSTRAP_BIN="qemu-debootstrap --arch armhf --variant=minbase"
 				LB_BOOTSTRAP_QEMU_ARCHITECTURES="armhf"
