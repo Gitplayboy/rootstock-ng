@@ -250,6 +250,11 @@ build_chroot()
 	# hack for click package location
 	sed -i 's,archive-team.internal,people.canonical.com/~ubuntu-archive,' \
 		$CHROOT/usr/share/livecd-rootfs/live-build/ubuntu-touch/hooks/60-install-click.chroot
+	# hack to workaround issue with missing mounted directory
+	sed -i 's,umount chroot/root/config,umount chroot/root/config || true,' \
+		$CHROOT/usr/lib/live/build/lb_chroot_hooks
+	sed -i 's,rmdir chroot/root/config,rmdir chroot/root/config || true,' \
+		$CHROOT/usr/lib/live/build/lb_chroot_hooks
 }
 
 build_touch()
