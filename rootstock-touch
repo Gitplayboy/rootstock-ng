@@ -59,7 +59,7 @@ cleanup()
 	fi
 }
 
-trap cleanup 0 1 2 3 9 15
+trap cleanup 0 1 2 3 15
 
 usage()
 {
@@ -144,7 +144,7 @@ case $ARCH in
 				LB_BOOTSTRAP_QEMU_STATIC=""
 				;;
 			*)
-				[ ! $(which qemu-debootstrap) ] && echo "please install the qemu-user-static package" && exit 1
+				[ ! "$(which qemu-debootstrap)" ] && echo "please install the qemu-user-static package" && exit 1
 				MIRROR="${MIRROR:-http://ports.ubuntu.com/ubuntu-ports}"
 				BOOTSTRAP_BIN="qemu-debootstrap --arch armhf --variant=minbase"
 				LB_BOOTSTRAP_QEMU_ARCHITECTURES="armhf"
@@ -161,11 +161,11 @@ case $ARCH in
 					LB_BOOTSTRAP_QEMU_STATIC=""
 					;;
 				*)
-					[ ! $(which qemu-debootstrap) ] && echo "please install the qemu-user-static package" && exit 1
+					[ ! "$(which qemu-debootstrap)" ] && echo "please install the qemu-user-static package" && exit 1
 					MIRROR="${MIRROR:-http://ports.ubuntu.com/ubuntu-ports}"
 					BOOTSTRAP_BIN="qemu-debootstrap --arch arm64 --variant=minbase"
 					LB_BOOTSTRAP_QEMU_ARCHITECTURES="arm64"
-					LB_BOOTSTRAP_QEMU_STATIC="/usr/bin/qemu-arm-static"
+					LB_BOOTSTRAP_QEMU_STATIC="/usr/bin/qemu-aarch64-static"
 					;;
 			esac
 			;;
@@ -181,17 +181,17 @@ case $PROJECT_ in
 		PROJECT=$PROJECT_
 		;;
 	ubuntu-touch)
-		[ "SUITE" = "vivid" ] || [ "SUITE" = "xenial"  ] && EXTRA_PPAS="ci-train-ppa-service/stable-phone-overlay:1001"
+		EXTRA_PPAS="ci-train-ppa-service/stable-phone-overlay:1001"
 		PROJECT=$PROJECT_
 		;;
 	ubports-touch)
-		[ "SUITE" = "vivid" ] || [ "SUITE" = "xenial"  ] && EXTRA_PPAS="ci-train-ppa-service/stable-phone-overlay:1001"
+		EXTRA_PPAS="ci-train-ppa-service/stable-phone-overlay:1001 ubports-developers/overlay:1001"
 		PROJECT="ubuntu-touch"
 		;;
 esac
 
 BUILDOPTS="SUBPROJECT=${SUBPROJECT} \
-	EXTRA_PPAS=${EXTRA_PPAS} \
+	EXTRA_PPAS=\"${EXTRA_PPAS}\" \
 	PREINSTALLED=${PREINSTALLED} \
 	LB_BOOTSTRAP_QEMU_ARCHITECTURES=${LB_BOOTSTRAP_QEMU_ARCHITECTURES} \
 	LB_BOOTSTRAP_QEMU_STATIC=${LB_BOOTSTRAP_QEMU_STATIC} \
@@ -243,6 +243,9 @@ build_chroot()
 	echo "deb $MIRROR $SUITE main universe" >$CHROOT/etc/apt/sources.list
 	echo "deb $MIRROR $SUITE-updates main universe" >>$CHROOT/etc/apt/sources.list
 	do_chroot $CHROOT "apt-get -y update"
+	do_chroot $CHROOT "apt-get -y install software-properties-common"
+	do_chroot $CHROOT "add-apt-repository -y ppa:ubports-developers/overlay"
+	do_chroot $CHROOT "apt-get -y update"
 	do_chroot $CHROOT "apt-get -y install livecd-rootfs"
 	mkdir -p $CHROOT/build
 	chroot $CHROOT sh -c "cd /build && rm -rf auto && mkdir -p auto && \
@@ -251,10 +254,24 @@ build_chroot()
 	sed -i 's,archive-team.internal,people.canonical.com/~ubuntu-archive,' \
 		$CHROOT/usr/share/livecd-rootfs/live-build/ubuntu-touch/hooks/60-install-click.chroot
 	# hack to workaround issue with missing mounted directory
-	sed -i 's,umount chroot/root/config,umount chroot/root/config || true,' \
+	sed -i 's,umount chroot/root/config,umount /build/chroot/root/config || true,' \
 		$CHROOT/usr/lib/live/build/lb_chroot_hooks
-	sed -i 's,rmdir chroot/root/config,rmdir chroot/root/config || true,' \
+	sed -i 's,rmdir chroot/root/config,rmdir /build/chroot/root/config || true,' \
 		$CHROOT/usr/lib/live/build/lb_chroot_hooks
+	sed -i 's,umount chroot/sys,umount /build/chroot/sys || true,' \
+		$CHROOT/usr/lib/live/build/lb_chroot_sysfs
+	sed -i 's,umount chroot/proc/sys/fs/binfmt_misc,tmpp,' \
+		$CHROOT/usr/lib/live/build/lb_chroot_proc
+	sed -i 's,umount chroot/proc,umount /build/chroot/proc || true,' \
+		$CHROOT/usr/lib/live/build/lb_chroot_proc
+	sed -i 's,umount chroot/proc,umount /build/chroot/proc || true,' \
+		$CHROOT/usr/lib/live/build/lb_binary_chroot
+	sed -i 's,umount chroot/sys,umount /build/chroot/sys || true,' \
+		$CHROOT/usr/lib/live/build/lb_binary_chroot
+	sed -i 's,tmpp,umount /build/chroot/proc/sys/fs/binfmt_misc || true,' \
+		$CHROOT/usr/lib/live/build/lb_chroot_proc
+	sed -i 's,umount chroot/dev/pts,umount /build/chroot/dev/pts || true,' \
+		$CHROOT/usr/lib/live/build/lb_chroot_devpts
 }
 
 build_touch()
@@ -268,7 +285,7 @@ copy_artefacts()
 {
 	mkdir -p $OUTDIR
 	for file in $(ls $CHROOT/build/livecd.*|grep -v bootimg); do
-		cp $file $OUTDIR/$(echo $file|sed -e s/^.*livecd.// -e s/rootfs/rootfs-$ARCH/)
+		cp $file "$OUTDIR/$(echo $file|sed -e s/^.*livecd.// -e s/rootfs/rootfs-$ARCH/ -e s/ubuntu/ubports/)"
 	done
 }
 
@@ -276,3 +293,4 @@ build_chroot
 [ -n "$DO_PPA" ] && set_up_ppa
 build_touch
 copy_artefacts
+echo "done"
