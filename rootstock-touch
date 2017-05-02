@@ -111,7 +111,6 @@ while [ $# -gt 0 ]; do
 			;;
 		-b|--buildir)
 			[ -n "$2" ] && CHROOT=$2 shift || usage
-			mkdir $CHROOT || true
 			;;
 		*)
 			usage
@@ -242,9 +241,6 @@ build_chroot()
 	echo "nameserver 8.8.8.8" >$CHROOT/etc/resolv.conf
 	echo "deb $MIRROR $SUITE main universe" >$CHROOT/etc/apt/sources.list
 	echo "deb $MIRROR $SUITE-updates main universe" >>$CHROOT/etc/apt/sources.list
-	do_chroot $CHROOT "apt-get -y update"
-	do_chroot $CHROOT "apt-get -y install software-properties-common"
-	do_chroot $CHROOT "add-apt-repository -y ppa:ubports-developers/overlay"
 	do_chroot $CHROOT "apt-get -y update"
 	do_chroot $CHROOT "apt-get -y install livecd-rootfs"
 	mkdir -p $CHROOT/build
