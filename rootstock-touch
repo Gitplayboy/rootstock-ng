@@ -203,6 +203,7 @@ BUILDOPTS="SUBPROJECT=${SUBPROJECT} \
 
 [ $(id -u) -ne 0 ] && exec sudo $0 $SUDOARGS
 
+mkdir $CHROOT || true
 touch $CHROOT/build.log
 tail -f $CHROOT/build.log &
 TAILPID=$!
@@ -235,21 +236,9 @@ set_up_ppa()
 	echo "$PPA_SOURCESLIST" >"$PPA_CONFDIR/$PPA_USER-$PPA_NAME.list.chroot"
 }
 
-build_chroot()
+xenial_hack()
 {
-	$BOOTSTRAP_BIN $SUITE $CHROOT $MIRROR
-	echo "nameserver 8.8.8.8" >$CHROOT/etc/resolv.conf
-	echo "deb $MIRROR $SUITE main universe" >$CHROOT/etc/apt/sources.list
-	echo "deb $MIRROR $SUITE-updates main universe" >>$CHROOT/etc/apt/sources.list
-	do_chroot $CHROOT "apt-get -y update"
-	do_chroot $CHROOT "apt-get -y install livecd-rootfs"
-	mkdir -p $CHROOT/build
-	chroot $CHROOT sh -c "cd /build && rm -rf auto && mkdir -p auto && \
-		for f in config build clean; do ln -s /usr/share/livecd-rootfs/live-build/auto/\$f auto/; done"
-	# hack for click package location
-	sed -i 's,archive-team.internal,people.canonical.com/~ubuntu-archive,' \
-		$CHROOT/usr/share/livecd-rootfs/live-build/ubuntu-touch/hooks/60-install-click.chroot
-	# hack to workaround issue with missing mounted directory
+	hack to workaround issue with missing mounted directory
 	sed -i 's,umount chroot/root/config,umount /build/chroot/root/config || true,' \
 		$CHROOT/usr/lib/live/build/lb_chroot_hooks
 	sed -i 's,rmdir chroot/root/config,rmdir /build/chroot/root/config || true,' \
@@ -268,6 +257,24 @@ build_chroot()
 		$CHROOT/usr/lib/live/build/lb_chroot_proc
 	sed -i 's,umount chroot/dev/pts,umount /build/chroot/dev/pts || true,' \
 		$CHROOT/usr/lib/live/build/lb_chroot_devpts
+}
+
+build_chroot()
+{
+	$BOOTSTRAP_BIN $SUITE $CHROOT $MIRROR
+	echo "nameserver 8.8.8.8" >$CHROOT/etc/resolv.conf
+	echo "deb $MIRROR $SUITE main universe" >$CHROOT/etc/apt/sources.list
+	echo "deb $MIRROR $SUITE-updates main universe" >>$CHROOT/etc/apt/sources.list
+	echo "deb http://ppa.launchpad.net/ubports-developers/overlay/ubuntu $SUITE main" >>$CHROOT/etc/apt/sources.list
+	do_chroot $CHROOT "apt-get -y update"
+	do_chroot $CHROOT "apt-get -y --force-yes install livecd-rootfs debootstrap"
+	mkdir -p $CHROOT/build
+	chroot $CHROOT sh -c "cd /build && rm -rf auto && mkdir -p auto && \
+		for f in config build clean; do ln -s /usr/share/livecd-rootfs/live-build/auto/\$f auto/; done"
+	# hack for click package location
+	sed -i 's,archive-team.internal,cdimage.ubports.com/clicks/,' \
+		$CHROOT/usr/share/livecd-rootfs/live-build/ubuntu-touch/hooks/60-install-click.chroot || true
+	[ "$SUITE" = "xenial" ] && xenial_hack
 }
 
 build_touch()
