@@ -21,7 +21,7 @@
 #  USA
 #
 
-set -e
+set -ex
 
 # needs 6.5GB free diskspace for building
 # TODO:
@@ -274,7 +274,7 @@ build_chroot()
 	# hack for click package location
 	sed -i 's,archive-team.internal,cdimage.ubports.com/clicks/,' \
 		$CHROOT/usr/share/livecd-rootfs/live-build/ubuntu-touch/hooks/60-install-click.chroot || true
-	[ "$SUITE" = "xenial" ] && xenial_hack
+	if [ "$SUITE" = "xenial" ]; then xenial_hack; fi
 }
 
 build_touch()
