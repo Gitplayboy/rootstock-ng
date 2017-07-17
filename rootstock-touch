@@ -236,29 +236,6 @@ set_up_ppa()
 	echo "$PPA_SOURCESLIST" >"$PPA_CONFDIR/$PPA_USER-$PPA_NAME.list.chroot"
 }
 
-xenial_hack()
-{
-	hack to workaround issue with missing mounted directory
-	sed -i 's,umount chroot/root/config,umount /build/chroot/root/config || true,' \
-		$CHROOT/usr/lib/live/build/lb_chroot_hooks
-	sed -i 's,rmdir chroot/root/config,rmdir /build/chroot/root/config || true,' \
-		$CHROOT/usr/lib/live/build/lb_chroot_hooks
-	sed -i 's,umount chroot/sys,umount /build/chroot/sys || true,' \
-		$CHROOT/usr/lib/live/build/lb_chroot_sysfs
-	sed -i 's,umount chroot/proc/sys/fs/binfmt_misc,tmpp,' \
-		$CHROOT/usr/lib/live/build/lb_chroot_proc
-	sed -i 's,umount chroot/proc,umount /build/chroot/proc || true,' \
-		$CHROOT/usr/lib/live/build/lb_chroot_proc
-	sed -i 's,umount chroot/proc,umount /build/chroot/proc || true,' \
-		$CHROOT/usr/lib/live/build/lb_binary_chroot
-	sed -i 's,umount chroot/sys,umount /build/chroot/sys || true,' \
-		$CHROOT/usr/lib/live/build/lb_binary_chroot
-	sed -i 's,tmpp,umount /build/chroot/proc/sys/fs/binfmt_misc || true,' \
-		$CHROOT/usr/lib/live/build/lb_chroot_proc
-	sed -i 's,umount chroot/dev/pts,umount /build/chroot/dev/pts || true,' \
-		$CHROOT/usr/lib/live/build/lb_chroot_devpts
-}
-
 build_chroot()
 {
 	$BOOTSTRAP_BIN $SUITE $CHROOT $MIRROR
@@ -274,14 +251,18 @@ build_chroot()
 	# hack for click package location
 	sed -i 's,archive-team.internal,cdimage.ubports.com/clicks/,' \
 		$CHROOT/usr/share/livecd-rootfs/live-build/ubuntu-touch/hooks/60-install-click.chroot || true
-	if [ "$SUITE" = "xenial" ]; then xenial_hack; fi
 }
 
 build_touch()
 {
+	chroot $CHROOT mount -t proc proc /proc
+	chroot $CHROOT mount -t sysfs sys /sys
 	chroot $CHROOT sh -c "cd /build && lb clean --purge"
 	chroot $CHROOT sh -c "cd /build && $BUILDOPTS lb config"
 	chroot $CHROOT sh -c "cd /build && $BUILDOPTS lb build"
+	chroot $CHROOT umount /sys
+	chroot $CHROOT umount /proc
+}
 }
 
 copy_artefacts()
