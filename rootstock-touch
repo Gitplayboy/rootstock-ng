@@ -21,7 +21,7 @@
 #  USA
 #
 
-set -ex
+set -e
 
 # needs 6.5GB free diskspace for building
 # TODO:
