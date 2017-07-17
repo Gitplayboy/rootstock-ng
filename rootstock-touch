@@ -1,4 +1,5 @@
 #!/bin/sh
+#  shellcheck disable=SC2039,SC2124,SC2010
 #
 #  Copyright (c) 2014 Canonical
 #  Copyright (c) 2017 The UBports Project
@@ -72,7 +73,9 @@ usage()
 	-p|--ppa (ppa url)	a ppa url in the form of ppa:user/ppaname
 	-s|--series		Ubuntu distro series
 	-t|--type		project type (ubports-touch|ubuntu-touch|ubuntu-core)
-	-b|--buidir (dir)	buildir, default: tmp\n"
+	-b|--buidir (dir)	buildir, default: tmp\n
+	-n|--native build with native hardware without need of chroot\n
+	-c|--native-chroot use native chroot (used for cross arch bulding)\n"
 #	-i|--inject-package (path to deb)	inject a single .deb in the build
 	exit 1
 }
@@ -112,6 +115,18 @@ while [ $# -gt 0 ]; do
 		-b|--buildir)
 			[ -n "$2" ] && CHROOT=$2 shift || usage
 			;;
+		-n|--native)
+			NATIVE=1
+			;;
+		-c|--native-chroot)
+			NATIVE_CHROOT=1
+			NATIVE_BOOTSTRAP_BIN="debootstrap --arch $HOSTARCH"
+			if [ $HOSTARCH = "armhf" ] || [ $HOSTARCH = "arm64" ]; then
+				NATIVE_MIRROR="http://ports.ubuntu.com/ubuntu-ports"
+			else
+				NATIVE_MIRROR="http://archive.ubuntu.com/ubuntu"
+			fi
+			;;
 		*)
 			usage
 			;;
@@ -129,6 +144,7 @@ case $ARCH in
 			*)
 				MIRROR="${MIRROR:-http://archive.ubuntu.com/ubuntu}"
 				BOOTSTRAP_BIN="debootstrap --arch $ARCH"
+				IS_NATIVE=1
 				LB_BOOTSTRAP_QEMU_ARCHITECTURES=""
 				LB_BOOTSTRAP_QEMU_STATIC=""
 				;;
@@ -141,6 +157,7 @@ case $ARCH in
 				BOOTSTRAP_BIN="debootstrap --arch $ARCH --variant=minbase"
 				LB_BOOTSTRAP_QEMU_ARCHITECTURES=""
 				LB_BOOTSTRAP_QEMU_STATIC=""
+				IS_NATIVE=1
 				;;
 			*)
 				[ ! "$(which qemu-debootstrap)" ] && echo "please install the qemu-user-static package" && exit 1
@@ -158,6 +175,7 @@ case $ARCH in
 					BOOTSTRAP_BIN="debootstrap --arch $ARCH --variant=minbase"
 					LB_BOOTSTRAP_QEMU_ARCHITECTURES=""
 					LB_BOOTSTRAP_QEMU_STATIC=""
+					IS_NATIVE=1
 					;;
 				*)
 					[ ! "$(which qemu-debootstrap)" ] && echo "please install the qemu-user-static package" && exit 1
@@ -201,7 +219,7 @@ BUILDOPTS="SUBPROJECT=${SUBPROJECT} \
 	PROJECT=${PROJECT} \
 	ARCH=${ARCH}"
 
-[ $(id -u) -ne 0 ] && exec sudo $0 $SUDOARGS
+[ "$(id -u)" -ne 0 ] && exec sudo $0 $SUDOARGS
 
 mkdir $CHROOT || true
 touch $CHROOT/build.log
@@ -238,13 +256,27 @@ set_up_ppa()
 
 build_chroot()
 {
-	$BOOTSTRAP_BIN $SUITE $CHROOT $MIRROR
+	if [ $NATIVE_CHROOT = "1" ]; then
+		$NATIVE_BOOTSTRAP_BIN $SUITE $CHROOT $NATIVE_MIRROR
+	else
+		$BOOTSTRAP_BIN $SUITE $CHROOT $MIRROR
+	fi
 	echo "nameserver 8.8.8.8" >$CHROOT/etc/resolv.conf
-	echo "deb $MIRROR $SUITE main universe" >$CHROOT/etc/apt/sources.list
-	echo "deb $MIRROR $SUITE-updates main universe" >>$CHROOT/etc/apt/sources.list
+	if [ "$NATIVE_CHROOT" = "1" ]; then
+		echo "deb $NATIVE_MIRROR $SUITE main universe" >$CHROOT/etc/apt/sources.list
+		echo "deb $NATIVE_MIRROR $SUITE-updates main universe" >>$CHROOT/etc/apt/sources.list
+	else
+		echo "deb $MIRROR $SUITE main universe" >$CHROOT/etc/apt/sources.list
+		echo "deb $MIRROR $SUITE-updates main universe" >>$CHROOT/etc/apt/sources.list
+	fi
 	echo "deb http://ppa.launchpad.net/ubports-developers/overlay/ubuntu $SUITE main" >>$CHROOT/etc/apt/sources.list
+	do_chroot $CHROOT "apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 6506B829CB0EE80B"
 	do_chroot $CHROOT "apt-get -y update"
-	do_chroot $CHROOT "apt-get -y --force-yes install livecd-rootfs debootstrap"
+	if [ "$NATIVE_CHROOT" = "1" ]; then
+		do_chroot $CHROOT "apt-get -y install livecd-rootfs debootstrap qemu-user-static"
+	else
+		do_chroot $CHROOT "apt-get -y install livecd-rootfs debootstrap"
+	fi
 	mkdir -p $CHROOT/build
 	chroot $CHROOT sh -c "cd /build && rm -rf auto && mkdir -p auto && \
 		for f in config build clean; do ln -s /usr/share/livecd-rootfs/live-build/auto/\$f auto/; done"
@@ -258,11 +290,25 @@ build_touch()
 	chroot $CHROOT mount -t proc proc /proc
 	chroot $CHROOT mount -t sysfs sys /sys
 	chroot $CHROOT sh -c "cd /build && lb clean --purge"
-	chroot $CHROOT sh -c "cd /build && $BUILDOPTS lb config"
+	if [ "$NATIVE_CHROOT" = "1" ]; then
+		chroot $CHROOT sh -c "cd /build && $BUILDOPTS lb config --bootstrap-qemu-arch $ARCH -a $ARCH"
+	else
+		chroot $CHROOT sh -c "cd /build && $BUILDOPTS lb config"
+	fi
 	chroot $CHROOT sh -c "cd /build && $BUILDOPTS lb build"
 	chroot $CHROOT umount /sys
 	chroot $CHROOT umount /proc
 }
+
+build_touch_native()
+ {
+	RETURN_DIR=$(pwd)
+	mkdir $CHROOT/build
+	cd $CHROOT/build
+	lb clean --purge
+	$BUILDOPTS lb config --bootstrap-qemu-arch $ARCH -a $ARCH
+	$BUILDOPTS lb build
+	cd $RETURN_DIR
 }
 
 copy_artefacts()
@@ -273,8 +319,19 @@ copy_artefacts()
 	done
 }
 
-build_chroot
+_echo()
+{
+	echo $1 >> $CHROOT/build.log
+}
+
+if [ "$NATIVE" != "1" ]; then
+ build_chroot
+fi
 [ -n "$DO_PPA" ] && set_up_ppa
-build_touch
+if [ "$NATIVE" = "1" ]; then
+ 	build_touch_native
+else
+	build_touch
+fi
 copy_artefacts
-echo "done"
+_echo "done"
