@@ -309,6 +309,8 @@ build_touch_native()
 	RETURN_DIR=$(pwd)
 	mkdir $CHROOT/build
 	cd $CHROOT/build
+	sh -c "rm -rf auto && mkdir -p auto && \
+  		for f in config build clean; do ln -s /usr/share/livecd-rootfs/live-build/auto/\$f auto/; done"
 	sh -c "lb clean --purge"
 	sh -c "$BUILDOPTS lb config --bootstrap-qemu-arch $ARCH -a $ARCH"
 	sh -c "$BUILDOPTS lb build"
