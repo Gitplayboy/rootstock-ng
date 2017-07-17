@@ -321,7 +321,7 @@ copy_artefacts()
 {
 	mkdir -p $OUTDIR
 	for file in $(ls $CHROOT/build/livecd.*|grep -v bootimg); do
-		cp $file "$OUTDIR/$(echo $file|sed -e s/^.*livecd.// -e s/rootfs/rootfs-$ARCH/ -e s/ubuntu/ubports/)"
+		cp $file "$OUTDIR/$(echo $file|sed -e s/^.*livecd.// -e s/rootfs/rootfs-$SUITE-$ARCH/ -e s/ubuntu/ubports/)"
 	done
 }
 
