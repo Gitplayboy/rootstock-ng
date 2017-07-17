@@ -75,7 +75,8 @@ usage()
 	-t|--type		project type (ubports-touch|ubuntu-touch|ubuntu-core)
 	-b|--buidir (dir)	buildir, default: tmp\n
 	-n|--native build with native hardware without need of chroot\n
-	-c|--native-chroot use native chroot (used for cross arch bulding)\n"
+	-c|--native-chroot use native chroot (used for cross arch bulding)\n
+	-l|--native-mirror (url) mirror to use  on native chroot (used for cross arch bulding)\n"
 #	-i|--inject-package (path to deb)	inject a single .deb in the build
 	exit 1
 }
@@ -92,6 +93,9 @@ while [ $# -gt 0 ]; do
 			;;
 		-m|--mirror)
 			[ -n "$2" ] && MIRROR=$2 shift || usage
+			;;
+		-l|--native_mirror)
+			[ -n "$2" ] && NATIVE_MIRROR=$2 shift || usage
 			;;
 		-o|--outdir)
 			[ -n "$2" ] && OUTDIR=$2 shift || usage
@@ -122,9 +126,9 @@ while [ $# -gt 0 ]; do
 			NATIVE_CHROOT=1
 			NATIVE_BOOTSTRAP_BIN="debootstrap --arch $HOSTARCH"
 			if [ $HOSTARCH = "armhf" ] || [ $HOSTARCH = "arm64" ]; then
-				NATIVE_MIRROR="http://ports.ubuntu.com/ubuntu-ports"
+				NATIVE_MIRROR="${NATIVE_MIRROR:-http://ports.ubuntu.com/ubuntu-ports}"
 			else
-				NATIVE_MIRROR="http://archive.ubuntu.com/ubuntu"
+				NATIVE_MIRROR="${NATIVE_MIRROR:-http://archive.ubuntu.com/ubuntu}"
 			fi
 			;;
 		*)
