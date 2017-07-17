@@ -206,7 +206,7 @@ case $PROJECT_ in
 		PROJECT=$PROJECT_
 		;;
 	ubports-touch)
-		EXTRA_PPAS="ci-train-ppa-service/stable-phone-overlay:1001 ubports-developers/overlay:1001"
+		EXTRA_PPAS="ci-train-ppa-service/stable-phone-overlay:1001 ubports-developers/overlay:1011"
 		PROJECT="ubuntu-touch"
 		;;
 esac
