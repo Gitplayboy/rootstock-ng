@@ -223,7 +223,7 @@ BUILDOPTS="SUBPROJECT=${SUBPROJECT} \
 	PROJECT=${PROJECT} \
 	ARCH=${ARCH}"
 
-[ "$(id -u)" -ne 0 ] && exec sudo $0 $SUDOARGS
+[ "$(id -u)" -ne 0 ] && exec sudo ORGUSER=$(whoami) $0 $SUDOARGS
 
 mkdir $CHROOT || true
 touch $CHROOT/build.log
@@ -323,6 +323,9 @@ copy_artefacts()
 	for file in $(ls $CHROOT/build/livecd.*|grep -v bootimg); do
 		cp $file "$OUTDIR/$(echo $file|sed -e s/^.*livecd.// -e s/rootfs/rootfs-$SUITE-$ARCH/ -e s/ubuntu/ubports/)"
 	done
+	if [ -n "$ORGUSER" ]; then
+		chown -R $ORGUSER $OUTDIR
+	fi
 }
 
 _echo()
